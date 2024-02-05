@@ -22,8 +22,9 @@
 **注意事项:**
 
 1. 使用前须填写好**account.json**文件
+   
+![image](https://github.com/CXRunfree/AutoUnipus/assets/79365257/16721b4f-8319-498c-a687-0536c12d84a3)
 
-2. <img src="D:\Coding\pythonProject\AutoUnipus\image-20240205150834386.png" alt="image-20240205150834386" style="zoom:90%;" />
 
    **各项参数含义:**
 
