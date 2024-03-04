@@ -27,7 +27,8 @@
 
 3. 使用前须填写好**account.json**文件
    
-![image](https://github.com/CXRunfree/AutoUnipus/assets/79365257/16721b4f-8319-498c-a687-0536c12d84a3)
+
+<img width="701" alt="account" src="https://github.com/CXRunfree/AutoUnipus/assets/79365257/73a373f8-d656-4cd2-8810-ab8f6d09a260">
 
 
    **各项参数含义:**
