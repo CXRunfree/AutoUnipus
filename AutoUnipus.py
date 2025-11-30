@@ -2,9 +2,12 @@ import json
 import re
 import time
 import traceback
+import uuid
+
+from PIL import Image
 from res import fetcher
 from playwright.sync_api import sync_playwright
-from playwright._impl._errors import TargetClosedError
+from playwright._impl._errors import TargetClosedError, TimeoutError
 
 
 def auto_login(page, _user, _pwd):
@@ -18,7 +21,6 @@ def auto_login(page, _user, _pwd):
     submit.click()
     print("[Tip]出现安全验证不必担心,手动认证就好了.")
     page.wait_for_timeout(1000)
-    print("[Tip]目前只支持单选题作答!")
     try:
         page.wait_for_selector('#pw-captchaCode', timeout=800)
         page.eval_on_selector('#pw-captchaCode', 'el => el.placeholder = "PS:请手动输入图形验证码"')
@@ -54,7 +56,10 @@ def auto_answer(page, auto_mode):
                 choice = answer[rank]["choice"]
                 select = ques.wait_for_selector(f'input[value="{choice}"]')
                 page.wait_for_timeout(100)
-                select.click()
+                try:
+                    select.click(timeout=1500)
+                except TimeoutError:
+                    return "selected"
                 rank += 1
             else:
                 flag = True
@@ -71,7 +76,7 @@ def auto_answer(page, auto_mode):
                                   'element => element.style.fontSize = "20px"')
             page.eval_on_selector('.dialog-header-pc--dialog-header-2qsXD',
                                   'element => element.innerHTML = "PS:&nbsp;&nbsp;&nbsp;存在不支持题型，本次答题不会提交"')
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(1500)
         else:
             return flag
 
@@ -88,7 +93,7 @@ def init_page():
     context.grant_permissions(['microphone', 'camera'])
     page = context.new_page()
     # 设置程序超时时限
-    page.set_default_timeout(6000000)
+    page.set_default_timeout(300000)
     # 进行登录
     print("[Info]等待登录完成...")
     auto_login(page, user, pwd)
@@ -106,6 +111,7 @@ def init_page():
 
 def auto_func():
     page = init_page()
+    title_pattern = re.compile("[0-9]+?\.[0-9]+?.+")
     # 根据用户数据进行选课
     class_urls = [url for url in account["class_url"] if "unipus" in url]
     for class_url in class_urls:
@@ -116,7 +122,7 @@ def auto_func():
         page.wait_for_selector(".icon-bixiu.iconCustumStyle.iconfont")  # truly valid wait
         must_exe = get_exercise(page)
         # 进行必修题目的答题
-        for exe in must_exe[-1:]:
+        for exe in must_exe:
             page.reload()
             page.wait_for_selector(".icon-bixiu.iconCustumStyle.iconfont")
             exe.click()
@@ -124,9 +130,17 @@ def auto_func():
                 page.wait_for_selector(".iKnow").click()  # 点击"我知道了"
             page.locator(".dialog-header-pc--close-yD7oN").click()  # 关闭提示框
             # 开始自动答题
-            auto_answer(page, automode)
-            page.goto(class_url)
+            flag = auto_answer(page, automode)
+            try:
+                if not flag:
+                    head = page.wait_for_selector(".layoutHeaderStyle--menuList-Ef90e", timeout=1000).text_content()
+                    title = re.findall(title_pattern, head)[0]
+                    print(f"[Info]获取 <<{title}>> 答案成功!")
+            finally:
+                page.goto(class_url)
         print(f"[Info]课程:{course.splitlines(keepends=False)[0]}已完成!")
+        if not verified:
+            print("[Tip]体验还不错?可以打赏作者哦~")
 
 
 def assist_func():
@@ -145,42 +159,46 @@ def assist_func():
         # 开始获取答案
         print("[Info]正在获取答案,请稍等...")
         flag = auto_answer(page, automode)
-        if flag:
+        if flag and flag != "selected":
             print("[Error]答案获取失败,不支持当前题型!")
-            continue
-        try:
-            head = page.wait_for_selector(".layoutHeaderStyle--menuList-Ef90e", timeout=1000).text_content()
-            title = re.findall(title_pattern, head)[0]
-            print(f"[Info]获取 <<{title}>> 答案成功!")
-        except:
-            print("[Info]获取答案成功!")
-            continue
+        elif flag == "selected":
+            print("[Info]当前页面已作答完毕!")
+        else:
+            try:
+                head = page.wait_for_selector(".layoutHeaderStyle--menuList-Ef90e", timeout=1000).text_content()
+                title = re.findall(title_pattern, head)[0]
+                print(f"[Info]获取 <<{title}>> 答案成功!")
+            finally:
+                continue
 
 
 if __name__ == '__main__':
     try:
-        # 读取用户数据
         with open("account.json", "r", encoding="utf-8") as f:
             account = json.loads(f.read())
             user = account["username"].strip()
             pwd = account["password"].strip()
             driver = account["Driver"].strip()
             automode = account["Automode"]
+            key = account["Key"].strip()
+            verified = fetcher.verify_key(key)
+        print("[Tip]目前只支持单选题作答!")
         print("===== Runtime Log =====")
         with sync_playwright() as p:
             if automode:
-                print("[System]Automode 已启动.")
+                print("[System]Automode active.")
                 auto_func()
                 print("所有课程已完成!!")
                 input("按Enter退出程序...")
             else:
-                print("[System]Assistmode 已启动.")
+                print("[System]Assistmode active.")
                 assist_func()
     except TargetClosedError:
         print("[Error]糟糕,网页关闭了!")
     except TimeoutError:
-        print("程序长时间无响应,自动退出...")
-
+        print("[Error]程序长时间无响应,自动退出...")
+    except FileNotFoundError:
+        print("[Error]程序缺失依赖文件,请重新安装程序!")
     except Exception as e:
         print(f"[Error]{e}")
         if type(e) == KeyError:

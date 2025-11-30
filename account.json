@@ -1,12 +1,8 @@
 {
-    "username": "  ",
-    "password": "  ",
-    "Automode": false,
-    "Driver" : " Edge ",
-    "class_url":
-    [
-      " first  class url ",
-      " second class url ",
-      " and so on... "
-    ]
+  "username": "",
+  "password": "",
+  "Automode": true,
+  "Driver" : " Edge ",
+  "Key" : "",
+  "class_url": ["", ""]
 }
